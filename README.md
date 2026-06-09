@@ -17,7 +17,7 @@ A clean, dark-themed screen recorder built with Tauri v2 + vanilla HTML/CSS/JS.
 
 ### Automatic versioned releases
 
-Every push to `main` now auto-generates a new tag in the format `v<run-number>-<commit-sha>` and creates a GitHub Release with the built installers attached.
+Every push to `main` now auto-generates a new tag in the format `v<yyyymmdd>-<commit-sha>` and creates a GitHub Release with the built installers attached.
 
 ---
 
