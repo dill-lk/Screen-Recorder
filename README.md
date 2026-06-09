@@ -15,14 +15,9 @@ A clean, dark-themed screen recorder built with Tauri v2 + vanilla HTML/CSS/JS.
    - `screen-recorder-msi-windows` — MSI installer
    - `screen-recorder-portable-windows` — standalone `.exe`
 
-### Create a versioned release
+### Automatic versioned releases
 
-Tag a commit and GitHub will auto-create a release with the installers attached:
-
-```bash
-git tag v1.0.0
-git push origin v1.0.0
-```
+Every push to `main` now auto-generates a new tag and creates a GitHub Release with the built installers attached.
 
 ---
 
