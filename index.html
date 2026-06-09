@@ -1,0 +1,907 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Screen Recorder</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+/* ─── Reset ───────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+/* ─── Tokens ──────────────────────────── */
+:root {
+  --bg-0:        #0f1117;
+  --bg-1:        #161b27;
+  --bg-2:        #1c2333;
+  --bg-3:        #222d40;
+  --bg-hover:    #263045;
+  --border:      rgba(255,255,255,.08);
+  --border-md:   rgba(255,255,255,.13);
+  --border-hi:   rgba(255,255,255,.2);
+
+  --text-1:      #f0f4ff;
+  --text-2:      #a8b3cc;
+  --text-3:      #6b7a99;
+  --text-4:      #414f68;
+
+  --blue:        #4f8ef7;
+  --blue-dim:    rgba(79,142,247,.15);
+  --blue-border: rgba(79,142,247,.35);
+
+  --red:         #f25c69;
+  --red-dim:     rgba(242,92,105,.12);
+  --red-border:  rgba(242,92,105,.3);
+
+  --green:       #3ecf8e;
+  --green-dim:   rgba(62,207,142,.1);
+
+  --amber:       #f5a524;
+  --amber-dim:   rgba(245,165,36,.1);
+  --amber-border:rgba(245,165,36,.3);
+
+  --r-xs:  6px;
+  --r-sm:  8px;
+  --r:     12px;
+  --r-lg:  16px;
+  --r-xl:  20px;
+  --r-pill:999px;
+
+  --shadow-sm: 0 1px 2px rgba(0,0,0,.3);
+  --shadow:    0 2px 8px rgba(0,0,0,.35);
+  --shadow-lg: 0 4px 20px rgba(0,0,0,.5);
+
+  --t:     180ms ease;
+  --t-slow:300ms cubic-bezier(.2,0,0,1);
+}
+
+/* ─── Base ────────────────────────────── */
+html { font-size: 15px; }
+body {
+  background: var(--bg-0);
+  color: var(--text-1);
+  font-family: 'Inter', system-ui, sans-serif;
+  min-height: 100vh;
+  -webkit-font-smoothing: antialiased;
+  overflow-x: hidden;
+}
+
+/* ─── Scrollbar ───────────────────────── */
+::-webkit-scrollbar { width: 5px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--bg-3); border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover { background: var(--border-hi); }
+
+/* ─── Topbar ──────────────────────────── */
+.topbar {
+  position: sticky; top: 0; z-index: 50;
+  height: 58px;
+  background: rgba(15,17,23,.92);
+  backdrop-filter: blur(16px);
+  border-bottom: 1px solid var(--border);
+  display: flex; align-items: center;
+  justify-content: space-between;
+  padding: 0 20px; gap: 14px;
+}
+.brand { display: flex; align-items: center; gap: 10px; }
+.brand-icon {
+  width: 32px; height: 32px;
+  border-radius: 9px;
+  background: linear-gradient(135deg,#4f8ef7 0%,#7c5cfc 100%);
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+  box-shadow: 0 2px 10px rgba(79,142,247,.3);
+}
+.brand-icon svg { width: 15px; height: 15px; color: #fff; }
+.brand-name {
+  font-size: .95rem; font-weight: 700;
+  letter-spacing: -.02em; color: var(--text-1);
+}
+.brand-name small {
+  font-size: .62rem; font-weight: 500;
+  color: var(--text-3); letter-spacing: .05em;
+  text-transform: uppercase; margin-left: 5px;
+  vertical-align: middle;
+}
+
+/* Status chip */
+.status-chip {
+  display: flex; align-items: center; gap: 8px;
+  font-size: .75rem; font-weight: 600;
+  color: var(--text-3);
+  background: var(--bg-2);
+  border: 1px solid var(--border);
+  padding: 6px 13px; border-radius: var(--r-pill);
+  transition: all var(--t); white-space: nowrap;
+}
+.status-chip .dot {
+  width: 7px; height: 7px; border-radius: 50%;
+  background: var(--text-4); flex-shrink: 0;
+  transition: all var(--t);
+}
+.status-chip.recording {
+  color: var(--red); background: var(--red-dim); border-color: var(--red-border);
+}
+.status-chip.recording .dot {
+  background: var(--red);
+  box-shadow: 0 0 0 3px rgba(242,92,105,.2);
+  animation: pulse 1.2s ease-in-out infinite;
+}
+.status-chip.paused {
+  color: var(--amber); background: var(--amber-dim); border-color: var(--amber-border);
+}
+.status-chip.paused .dot { background: var(--amber); animation: none; }
+.timer {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: .8rem; letter-spacing: .05em;
+}
+
+/* ─── Layout ──────────────────────────── */
+.page {
+  max-width: 1080px; margin: 0 auto;
+  padding: 22px 20px 48px;
+  display: flex; flex-direction: column; gap: 16px;
+}
+
+/* ─── Recovery Banner ─────────────────── */
+.recovery-banner {
+  display: flex; align-items: center; gap: 14px;
+  padding: 13px 18px;
+  background: var(--amber-dim);
+  border: 1px solid var(--amber-border);
+  border-radius: var(--r-lg);
+  animation: slideDown var(--t-slow);
+  flex-wrap: wrap;
+}
+.rb-icon {
+  width: 34px; height: 34px; border-radius: 50%; flex-shrink: 0;
+  background: rgba(245,165,36,.15);
+  display: flex; align-items: center; justify-content: center;
+}
+.rb-icon svg { width: 16px; height: 16px; color: var(--amber); }
+.rb-text { flex: 1; min-width: 180px; }
+.rb-text strong { display: block; font-size: .85rem; font-weight: 700; color: #f5c87a; margin-bottom: 2px; }
+.rb-text span { font-size: .75rem; color: #c49040; }
+.rb-actions { display: flex; gap: 8px; flex-shrink: 0; }
+
+/* ─── Main grid ───────────────────────── */
+.main-grid {
+  display: grid;
+  grid-template-columns: 1fr 360px;
+  gap: 16px; align-items: start;
+}
+@media (max-width: 820px) { .main-grid { grid-template-columns: 1fr; } }
+
+/* ─── Card ────────────────────────────── */
+.card {
+  background: var(--bg-1);
+  border: 1px solid var(--border);
+  border-radius: var(--r-xl);
+  overflow: hidden;
+  box-shadow: var(--shadow);
+  transition: border-color var(--t);
+}
+.card:hover { border-color: var(--border-md); }
+.section-label {
+  font-size: .68rem; font-weight: 700; text-transform: uppercase;
+  letter-spacing: .08em; color: var(--text-3); margin-bottom: 12px;
+}
+
+/* ─── Preview ─────────────────────────── */
+.preview-area {
+  background: #080a0f;
+  aspect-ratio: 16/9;
+  display: flex; align-items: center; justify-content: center;
+  position: relative; overflow: hidden;
+}
+.preview-area video { width: 100%; height: 100%; object-fit: contain; display: none; }
+.preview-idle {
+  display: flex; flex-direction: column; align-items: center;
+  gap: 8px; color: var(--text-4); text-align: center; padding: 2rem;
+}
+.idle-icon {
+  width: 52px; height: 52px; border-radius: 50%;
+  background: rgba(255,255,255,.04);
+  display: flex; align-items: center; justify-content: center; margin-bottom: 4px;
+}
+.idle-icon svg { width: 24px; height: 24px; color: var(--text-4); }
+.preview-idle p { font-size: .82rem; color: var(--text-3); }
+.preview-idle p small { display: block; font-size: .7rem; color: var(--text-4); margin-top: 2px; }
+
+/* cam PiP badge */
+.pip-badge {
+  position: absolute; bottom: 12px; right: 12px;
+  width: 88px; height: 66px;
+  background: rgba(0,0,0,.45); border-radius: var(--r-sm);
+  border: 1px solid rgba(255,255,255,.12);
+  display: none; align-items: center; justify-content: center;
+  flex-direction: column; gap: 4px;
+  color: var(--text-3); font-size: .62rem; text-align: center;
+}
+.pip-badge svg { width: 13px; height: 13px; }
+.cam-on .pip-badge { display: flex; }
+
+/* ─── Level meters ────────────────────── */
+.meters-row {
+  padding: 10px 16px;
+  display: flex; gap: 10px;
+  border-top: 1px solid var(--border);
+}
+.meter-wrap { flex: 1; }
+.meter-label { font-size: .65rem; color: var(--text-3); margin-bottom: 5px; display: flex; align-items: center; gap: 5px; }
+.meter-label svg { width: 11px; height: 11px; }
+.meter-track {
+  height: 4px; background: var(--bg-3);
+  border-radius: 4px; overflow: hidden;
+}
+.meter-fill {
+  height: 100%; width: 0%;
+  border-radius: 4px;
+  transition: width 80ms linear;
+  background: linear-gradient(90deg, var(--green) 0%, var(--amber) 75%, var(--red) 100%);
+}
+
+/* ─── Control row ─────────────────────── */
+.control-row {
+  padding: 13px 16px;
+  display: flex; align-items: center; gap: 8px;
+  border-top: 1px solid var(--border); flex-wrap: wrap;
+}
+.storage-hint {
+  margin-left: auto; font-size: .7rem; color: var(--text-3);
+  display: flex; align-items: center; gap: 5px; white-space: nowrap;
+}
+.storage-hint svg { width: 12px; height: 12px; color: var(--green); }
+.storage-hint b { color: var(--green); font-weight: 600; }
+
+/* ─── Buttons ─────────────────────────── */
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  font-family: inherit; font-size: .82rem; font-weight: 600;
+  padding: 0 16px; height: 38px; border-radius: var(--r-pill);
+  border: none; cursor: pointer;
+  transition: all var(--t); letter-spacing: .01em; white-space: nowrap;
+  position: relative; overflow: hidden;
+}
+.btn::after {
+  content: ''; position: absolute; inset: 0;
+  background: transparent; transition: background var(--t);
+}
+.btn:hover::after { background: rgba(255,255,255,.06); }
+.btn:active { transform: scale(.95); }
+.btn:disabled { opacity: .3; cursor: not-allowed; pointer-events: none; }
+.btn svg { width: 15px; height: 15px; flex-shrink: 0; }
+
+.btn-primary { background: var(--blue); color: #fff; box-shadow: 0 1px 8px rgba(79,142,247,.3); }
+.btn-primary:hover { box-shadow: 0 2px 14px rgba(79,142,247,.45); }
+
+.btn-danger { background: var(--red); color: #fff; box-shadow: 0 1px 8px rgba(242,92,105,.25); }
+.btn-danger:hover { box-shadow: 0 2px 14px rgba(242,92,105,.4); }
+
+.btn-secondary { background: var(--bg-3); color: var(--text-2); border: 1px solid var(--border); }
+.btn-secondary:hover { background: var(--bg-hover); border-color: var(--border-md); color: var(--text-1); }
+
+.btn-ghost { background: transparent; color: var(--text-2); border: 1px solid var(--border); }
+.btn-ghost:hover { background: var(--bg-2); border-color: var(--border-md); }
+
+.btn-amber { background: var(--amber); color: #1a0e00; font-weight: 700; }
+.btn-text  { background: transparent; border: none; color: var(--text-3); font-size: .78rem; padding: 0 10px; }
+.btn-text:hover { color: var(--text-2); }
+.btn-sm    { height: 32px; padding: 0 12px; font-size: .76rem; }
+
+/* ─── Settings panel ──────────────────── */
+.settings-panel { display: flex; flex-direction: column; }
+
+/* file name */
+.fname-wrap { padding: 16px 18px 14px; }
+.field-label {
+  font-size: .7rem; font-weight: 600; color: var(--text-3);
+  margin-bottom: 7px; letter-spacing: .03em;
+}
+.input-wrap { position: relative; }
+.input-wrap svg {
+  position: absolute; left: 11px; top: 50%; transform: translateY(-50%);
+  width: 14px; height: 14px; color: var(--text-4); pointer-events: none;
+}
+.text-input {
+  width: 100%; height: 40px; padding: 0 12px 0 34px;
+  background: var(--bg-2); border: 1.5px solid var(--border);
+  border-radius: var(--r-sm); color: var(--text-1);
+  font-family: inherit; font-size: .82rem;
+  transition: all var(--t);
+}
+.text-input::placeholder { color: var(--text-4); }
+.text-input:focus { outline: none; border-color: var(--blue); background: var(--bg-3); box-shadow: 0 0 0 3px var(--blue-dim); }
+.text-input:disabled { opacity: .35; cursor: not-allowed; }
+
+/* quality */
+.quality-wrap { padding: 14px 18px; border-top: 1px solid var(--border); }
+.quality-grid {
+  display: grid; grid-template-columns: repeat(3,1fr); gap: 6px;
+}
+.q-btn {
+  background: var(--bg-2); border: 1.5px solid var(--border);
+  border-radius: var(--r-sm); padding: 10px 4px 9px;
+  text-align: center; cursor: pointer; transition: all var(--t);
+  color: var(--text-3); font-family: inherit;
+}
+.q-btn:hover:not(:disabled) { border-color: var(--border-md); background: var(--bg-3); color: var(--text-1); }
+.q-btn.active { background: var(--blue-dim); border-color: var(--blue-border); color: var(--blue); }
+.q-btn:disabled { opacity: .3; cursor: not-allowed; pointer-events: none; }
+.q-res { font-size: .78rem; font-weight: 700; display: block; letter-spacing: -.01em; }
+.q-detail { font-size: .6rem; color: var(--text-4); font-weight: 500; }
+.q-btn.active .q-detail { color: var(--blue-border); }
+
+/* sources */
+.sources-wrap { padding: 12px 18px 8px; border-top: 1px solid var(--border); }
+.toggle-row {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 10px 0; border-bottom: 1px solid var(--border); gap: 10px;
+}
+.toggle-row:last-child { border-bottom: none; padding-bottom: 4px; }
+.toggle-left { display: flex; align-items: center; gap: 11px; cursor: pointer; user-select: none; }
+.t-icon {
+  width: 32px; height: 32px; border-radius: 9px;
+  background: var(--bg-2); border: 1px solid var(--border);
+  display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+}
+.t-icon svg { width: 14px; height: 14px; color: var(--text-3); }
+.t-text { font-size: .83rem; color: var(--text-2); font-weight: 500; }
+.t-sub  { font-size: .68rem; color: var(--text-4); margin-top: 1px; }
+
+/* switch */
+.switch { position: relative; width: 42px; height: 24px; flex-shrink: 0; }
+.switch input { opacity: 0; width: 0; height: 0; position: absolute; }
+.sw-track {
+  position: absolute; inset: 0; border-radius: 24px;
+  background: var(--bg-3); border: 1px solid var(--border-md);
+  cursor: pointer; transition: all var(--t);
+}
+.sw-track::before {
+  content: ''; position: absolute;
+  height: 18px; width: 18px; left: 2px; bottom: 2px;
+  background: var(--text-3); border-radius: 50%;
+  transition: transform 180ms cubic-bezier(.34,1.56,.64,1), background var(--t);
+  box-shadow: 0 1px 3px rgba(0,0,0,.35);
+}
+.switch input:checked + .sw-track { background: var(--blue); border-color: var(--blue); }
+.switch input:checked + .sw-track::before { transform: translateX(18px); background: #fff; }
+.switch input:focus-visible + .sw-track { outline: 2px solid var(--blue); outline-offset: 3px; }
+
+/* ─── Recordings ──────────────────────── */
+.recordings-card { display: none; }
+.recordings-wrap { padding: 16px 18px 12px; }
+.rec-list {
+  display: flex; flex-direction: column; gap: 6px;
+  max-height: 340px; overflow-y: auto; margin-top: 4px;
+}
+.rec-item {
+  display: flex; align-items: center; gap: 12px;
+  padding: 11px 14px;
+  background: var(--bg-2); border: 1px solid var(--border);
+  border-radius: var(--r); transition: all var(--t);
+}
+.rec-item:hover { background: var(--bg-3); border-color: var(--border-md); }
+.rec-thumb {
+  width: 38px; height: 28px; border-radius: 5px;
+  background: var(--blue-dim); border: 1px solid var(--blue-border);
+  display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+}
+.rec-thumb svg { width: 14px; height: 14px; color: var(--blue); }
+.rec-info { flex: 1; min-width: 0; }
+.rec-name { font-size: .82rem; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--text-1); }
+.rec-meta { font-size: .68rem; color: var(--text-3); margin-top: 2px; }
+
+/* ─── Animations ──────────────────────── */
+@keyframes pulse {
+  0%,100% { opacity:1; transform:scale(1); }
+  50%      { opacity:.5; transform:scale(1.4); }
+}
+@keyframes slideDown {
+  from { opacity:0; transform:translateY(-10px); }
+  to   { opacity:1; transform:translateY(0); }
+}
+</style>
+</head>
+<body>
+
+<!-- Topbar -->
+<header class="topbar">
+  <div class="brand">
+    <div class="brand-icon">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="12" cy="12" r="9"/><polygon points="10 8 16 12 10 16 10 8" fill="currentColor" stroke="none"/>
+      </svg>
+    </div>
+    <span class="brand-name">Screen Recorder <small>v1.0</small></span>
+  </div>
+
+  <div class="status-chip" id="statusChip">
+    <span class="dot"></span>
+    <span id="statusLabel">Ready</span>
+    <span class="timer" id="timerEl" style="display:none"></span>
+  </div>
+</header>
+
+<!-- Page -->
+<main class="page">
+
+  <!-- Recovery -->
+  <div id="recoverySection"></div>
+
+  <!-- Grid -->
+  <div class="main-grid">
+
+    <!-- Left -->
+    <div>
+      <div class="card">
+        <div class="preview-area" id="previewArea">
+          <div class="preview-idle" id="idleMsg">
+            <div class="idle-icon">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                <rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/>
+              </svg>
+            </div>
+            <p>No active recording<small>Press "Start" to begin</small></p>
+          </div>
+          <video id="liveVideo" autoplay muted playsinline></video>
+          <div class="pip-badge" id="pipBadge">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 7l-7 5 7 5V7z"/><rect x="1" y="5" width="15" height="14" rx="2"/></svg>
+            Camera
+          </div>
+        </div>
+
+        <!-- Audio meters -->
+        <div class="meters-row" id="metersRow" style="display:none">
+          <div class="meter-wrap">
+            <div class="meter-label">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/></svg>
+              Mic
+            </div>
+            <div class="meter-track"><div class="meter-fill" id="micMeter"></div></div>
+          </div>
+          <div class="meter-wrap">
+            <div class="meter-label">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/></svg>
+              System
+            </div>
+            <div class="meter-track"><div class="meter-fill" id="sysMeter"></div></div>
+          </div>
+        </div>
+
+        <!-- Controls -->
+        <div class="control-row">
+          <button class="btn btn-primary" id="startBtn">
+            <svg viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="8"/></svg>
+            Start
+          </button>
+          <button class="btn btn-danger" id="stopBtn" disabled>
+            <svg viewBox="0 0 24 24" fill="currentColor"><rect x="4" y="4" width="16" height="16" rx="2"/></svg>
+            Stop
+          </button>
+          <button class="btn btn-secondary" id="pauseBtn" disabled>
+            <svg viewBox="0 0 24 24" fill="currentColor" id="pauseIcon">
+              <rect x="6" y="4" width="4" height="16" rx="1"/><rect x="14" y="4" width="4" height="16" rx="1"/>
+            </svg>
+            <span id="pauseLabel">Pause</span>
+          </button>
+
+          <div class="storage-hint" id="storageHint">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+            Checking…
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Right: settings -->
+    <div>
+      <div class="card settings-panel">
+
+        <!-- File name -->
+        <div class="fname-wrap">
+          <div class="field-label">File name</div>
+          <div class="input-wrap">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+            <input type="text" class="text-input" id="fileNameInput" placeholder="my-recording (optional)">
+          </div>
+        </div>
+
+        <!-- Quality -->
+        <div class="quality-wrap">
+          <div class="section-label">Quality</div>
+          <div class="quality-grid" id="qualityGrid">
+            <button class="q-btn" data-w="1280" data-h="720" data-fps="30" data-br="5000000"><span class="q-res">720p</span><span class="q-detail">30 fps</span></button>
+            <button class="q-btn" data-w="1280" data-h="720" data-fps="60" data-br="8000000"><span class="q-res">720p</span><span class="q-detail">60 fps</span></button>
+            <button class="q-btn active" data-w="1920" data-h="1080" data-fps="30" data-br="12000000"><span class="q-res">1080p</span><span class="q-detail">30 fps</span></button>
+            <button class="q-btn" data-w="1920" data-h="1080" data-fps="60" data-br="20000000"><span class="q-res">1080p</span><span class="q-detail">60 fps</span></button>
+            <button class="q-btn" data-w="2560" data-h="1440" data-fps="30" data-br="28000000"><span class="q-res">1440p</span><span class="q-detail">30 fps</span></button>
+            <button class="q-btn" data-w="3840" data-h="2160" data-fps="30" data-br="45000000"><span class="q-res">4K</span><span class="q-detail">30 fps</span></button>
+          </div>
+        </div>
+
+        <!-- Sources -->
+        <div class="sources-wrap">
+          <div class="section-label">Sources</div>
+
+          <div class="toggle-row">
+            <label class="toggle-left" for="micToggle">
+              <div class="t-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2M12 19v4M8 23h8"/></svg>
+              </div>
+              <div><div class="t-text">Microphone</div><div class="t-sub">Your voice</div></div>
+            </label>
+            <label class="switch">
+              <input type="checkbox" id="micToggle"><!-- off by default -->
+              <span class="sw-track"></span>
+            </label>
+          </div>
+
+          <div class="toggle-row">
+            <label class="toggle-left" for="sysToggle">
+              <div class="t-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"/></svg>
+              </div>
+              <div><div class="t-text">System audio</div><div class="t-sub">Computer sounds</div></div>
+            </label>
+            <label class="switch">
+              <input type="checkbox" id="sysToggle" checked>
+              <span class="sw-track"></span>
+            </label>
+          </div>
+
+          <div class="toggle-row">
+            <label class="toggle-left" for="camToggle">
+              <div class="t-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 7l-7 5 7 5V7z"/><rect x="1" y="5" width="15" height="14" rx="2"/></svg>
+              </div>
+              <div><div class="t-text">Camera</div><div class="t-sub">Picture-in-picture</div></div>
+            </label>
+            <label class="switch">
+              <input type="checkbox" id="camToggle">
+              <span class="sw-track"></span>
+            </label>
+          </div>
+
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Recordings -->
+  <div class="card recordings-card" id="recordingsCard">
+    <div class="recordings-wrap">
+      <div class="section-label">Saved recordings</div>
+      <div class="rec-list" id="recItems"></div>
+    </div>
+  </div>
+
+</main>
+
+<script>
+(function () {
+  /* ── State ──────────────────────────── */
+  let mediaRecorder, screenStream, micStream, camStream;
+  let micAnalyser, sysAnalyser, micData, sysData, meterRAF;
+  let chunks = [], timer, elapsed = 0, paused = false;
+  let selectedQ = { w: 1920, h: 1080, fps: 30, br: 12000000 };
+  const recordings = [];
+  let db, totalBytes = 0;
+  const DB_NAME = 'ScreenRecorderDB', STORE = 'chunks_v1';
+
+  /* ── DOM ────────────────────────────── */
+  const $ = id => document.getElementById(id);
+  const startBtn     = $('startBtn'),   stopBtn     = $('stopBtn');
+  const pauseBtn     = $('pauseBtn'),   pauseIcon   = $('pauseIcon');
+  const pauseLabel   = $('pauseLabel'), liveVideo   = $('liveVideo');
+  const idleMsg      = $('idleMsg'),    previewArea = $('previewArea');
+  const pipBadge     = $('pipBadge'),   statusChip  = $('statusChip');
+  const statusLabel  = $('statusLabel'),timerEl     = $('timerEl');
+  const recItems     = $('recItems'),   recordingsCard = $('recordingsCard');
+  const recovSection = $('recoverySection'), storageHint = $('storageHint');
+  const fileInput    = $('fileNameInput');
+  const metersRow    = $('metersRow');
+  const micMeter     = $('micMeter'),   sysMeter    = $('sysMeter');
+
+  /* ── Storage quota ──────────────────── */
+  (async () => {
+    if (!navigator.storage?.estimate) return;
+    try {
+      const { quota, usage } = await navigator.storage.estimate();
+      const gb = ((quota - usage) / 1e9).toFixed(1);
+      storageHint.innerHTML = `
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+        <b>${gb} GB</b> free`;
+    } catch { storageHint.style.display = 'none'; }
+  })();
+
+  /* ── IndexedDB ──────────────────────── */
+  function initDB() {
+    return new Promise((res, rej) => {
+      const r = indexedDB.open(DB_NAME, 2);
+      r.onupgradeneeded = e => {
+        const d = e.target.result;
+        if (!d.objectStoreNames.contains(STORE)) d.createObjectStore(STORE, { autoIncrement: true });
+      };
+      r.onsuccess = e => { db = e.target.result; res(db); };
+      r.onerror   = rej;
+    });
+  }
+  function saveChunk(chunk) {
+    if (!db || paused) return;
+    db.transaction(STORE, 'readwrite').objectStore(STORE).add(chunk);
+    totalBytes += chunk.size;
+  }
+  function clearChunks() {
+    return new Promise(res => {
+      if (!db) return res();
+      db.transaction(STORE, 'readwrite').objectStore(STORE).clear().onsuccess = () => { totalBytes = 0; res(); };
+    });
+  }
+
+  /* ── Recovery ───────────────────────── */
+  (async () => {
+    try {
+      await initDB();
+      const tx = db.transaction(STORE, 'readonly');
+      tx.objectStore(STORE).getAll().onsuccess = e => {
+        const saved = e.target.result;
+        if (!saved?.length) return;
+        const mb = (saved.reduce((a,c) => a + c.size, 0) / 1048576).toFixed(1);
+        recovSection.innerHTML = `
+          <div class="recovery-banner">
+            <div class="rb-icon">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
+              </svg>
+            </div>
+            <div class="rb-text">
+              <strong>Unsaved recording found</strong>
+              <span>${mb} MB wasn't saved — the tab may have closed during recording.</span>
+            </div>
+            <div class="rb-actions">
+              <button class="btn btn-sm btn-amber" id="recoverBtn">Save to downloads</button>
+              <button class="btn btn-sm btn-text" id="discardBtn">Discard</button>
+            </div>
+          </div>`;
+        $('recoverBtn').onclick = () => {
+          const a = document.createElement('a');
+          a.href = URL.createObjectURL(new Blob(saved, { type: 'video/webm' }));
+          a.download = `recovered-${Date.now()}.webm`;
+          a.click();
+          clearChunks().then(() => recovSection.innerHTML = '');
+        };
+        $('discardBtn').onclick = () => {
+          if (confirm('Discard the recovered recording? This cannot be undone.'))
+            clearChunks().then(() => recovSection.innerHTML = '');
+        };
+      };
+    } catch(e) { console.warn('Recovery check failed', e); }
+  })();
+
+  /* ── Quality buttons ────────────────── */
+  document.querySelectorAll('.q-btn').forEach(btn => {
+    btn.onclick = () => {
+      document.querySelectorAll('.q-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      selectedQ = { w:+btn.dataset.w, h:+btn.dataset.h, fps:+btn.dataset.fps, br:+btn.dataset.br };
+    };
+  });
+
+  /* ── Timer ──────────────────────────── */
+  function fmt(s) {
+    return [Math.floor(s/3600), Math.floor((s%3600)/60), s%60]
+      .map(v => String(v).padStart(2,'0')).join(':');
+  }
+  function setStatus(mode, text) {
+    statusChip.className = 'status-chip' + (mode ? ` ${mode}` : '');
+    statusLabel.textContent = text;
+    timerEl.style.display = (mode === 'recording' || mode === 'paused') ? '' : 'none';
+  }
+
+  /* ── Audio meters ───────────────────── */
+  function startMeters(ac, micSrc, sysSrc) {
+    metersRow.style.display = 'flex';
+    const setup = src => {
+      if (!src) return null;
+      const a = ac.createAnalyser(); a.fftSize = 256;
+      src.connect(a); return { a, d: new Uint8Array(a.fftSize) };
+    };
+    const m = setup(micSrc), s = setup(sysSrc);
+    const tick = () => {
+      meterRAF = requestAnimationFrame(tick);
+      if (m) { m.a.getByteTimeDomainData(m.d); micMeter.style.width = getLvl(m.d) + '%'; }
+      if (s) { s.a.getByteTimeDomainData(s.d); sysMeter.style.width = getLvl(s.d) + '%'; }
+    };
+    tick();
+  }
+  function getLvl(data) {
+    let max = 0;
+    for (let v of data) { const n = Math.abs(v - 128); if (n > max) max = n; }
+    return Math.min(100, (max / 128) * 200);
+  }
+  function stopMeters() {
+    cancelAnimationFrame(meterRAF);
+    micMeter.style.width = '0%'; sysMeter.style.width = '0%';
+    metersRow.style.display = 'none';
+  }
+
+  /* ── Tab guard ──────────────────────── */
+  const guard = e => { e.preventDefault(); e.returnValue = ''; };
+
+  /* ── Start ──────────────────────────── */
+  async function startRecording() {
+    try {
+      const useMic = $('micToggle').checked;
+      const useSys = $('sysToggle').checked;
+      const useCam = $('camToggle').checked;
+      setStatus('', 'Starting…');
+      await clearChunks();
+
+      screenStream = await navigator.mediaDevices.getDisplayMedia({
+        video: { width:{ideal:selectedQ.w}, height:{ideal:selectedQ.h}, frameRate:{ideal:selectedQ.fps}, cursor:'always' },
+        audio: useSys ? { echoCancellation:false, noiseSuppression:false } : false
+      });
+
+      const ac = new AudioContext();
+      const dest = ac.createMediaStreamDestination();
+      let micSrcNode = null, sysSrcNode = null;
+
+      const sysAudioTracks = useSys ? screenStream.getAudioTracks() : [];
+      if (sysAudioTracks.length) {
+        sysSrcNode = ac.createMediaStreamSource(new MediaStream(sysAudioTracks));
+        sysSrcNode.connect(dest);
+      }
+
+      if (useMic) {
+        try {
+          micStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+          micSrcNode = ac.createMediaStreamSource(micStream);
+          micSrcNode.connect(dest);
+        } catch { /* mic denied */ }
+      }
+
+      const allTracks = [screenStream.getVideoTracks()[0]];
+
+      if (useCam) {
+        try {
+          camStream = await navigator.mediaDevices.getUserMedia({ video: { width:320, height:240 }, audio:false });
+          const canvas = Object.assign(document.createElement('canvas'), { width:selectedQ.w, height:selectedQ.h });
+          const ctx = canvas.getContext('2d');
+          ctx.imageSmoothingQuality = 'high';
+          const mv = Object.assign(document.createElement('video'), { autoplay:true, muted:true });
+          mv.srcObject = new MediaStream([screenStream.getVideoTracks()[0]]); mv.play();
+          const cv = Object.assign(document.createElement('video'), { autoplay:true, muted:true });
+          cv.srcObject = camStream; cv.play();
+          const pw = selectedQ.w/4, ph = selectedQ.h/4;
+          const pip = () => {
+            ctx.drawImage(mv, 0, 0, selectedQ.w, selectedQ.h);
+            const r = Math.min(pw,ph)/2, cx = selectedQ.w-pw/2-16, cy = selectedQ.h-ph/2-16;
+            ctx.save(); ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI*2); ctx.clip();
+            ctx.drawImage(cv, selectedQ.w-pw-16, selectedQ.h-ph-16, pw, ph);
+            ctx.restore(); requestAnimationFrame(pip);
+          };
+          pip();
+          allTracks[0] = canvas.captureStream(selectedQ.fps).getVideoTracks()[0];
+          previewArea.classList.add('cam-on');
+        } catch(e) { console.warn('Camera:', e); }
+      }
+
+      if (dest.stream.getAudioTracks().length) allTracks.push(...dest.stream.getAudioTracks());
+
+      // Start meters if any audio active
+      if (micSrcNode || sysSrcNode) startMeters(ac, micSrcNode, sysSrcNode);
+
+      const mixed = new MediaStream(allTracks);
+      liveVideo.srcObject = new MediaStream([screenStream.getVideoTracks()[0]]);
+      liveVideo.style.display = 'block'; idleMsg.style.display = 'none';
+
+      const mime = ['video/webm;codecs=h264,opus','video/webm;codecs=vp8,opus','video/webm']
+        .find(m => MediaRecorder.isTypeSupported(m)) || '';
+      mediaRecorder = new MediaRecorder(mixed, { mimeType:mime, videoBitsPerSecond:selectedQ.br, audioBitsPerSecond:128000 });
+      chunks = [];
+      mediaRecorder.ondataavailable = e => { if (e.data?.size > 0) { chunks.push(e.data); saveChunk(e.data); } };
+      mediaRecorder.onstop = finalise;
+      mediaRecorder.start(3000);
+
+      window.addEventListener('beforeunload', guard);
+      elapsed = 0; paused = false;
+      timer = setInterval(() => { if (!paused) { elapsed++; timerEl.textContent = fmt(elapsed); } }, 1000);
+      timerEl.textContent = '00:00:00';
+      setStatus('recording', 'Recording');
+      startBtn.disabled = true; stopBtn.disabled = false; pauseBtn.disabled = false;
+      document.querySelectorAll('.q-btn, .text-input').forEach(el => el.disabled = true);
+      screenStream.getVideoTracks()[0].addEventListener('ended', stopRecording);
+    } catch(e) { setStatus('', 'Ready'); console.error(e); }
+  }
+
+  /* ── Stop ───────────────────────────── */
+  function stopRecording() {
+    if (!mediaRecorder || mediaRecorder.state === 'inactive') return;
+    mediaRecorder.stop();
+    clearInterval(timer); stopMeters();
+    [screenStream, micStream, camStream].forEach(s => s?.getTracks().forEach(t => t.stop()));
+    liveVideo.style.display = 'none'; idleMsg.style.display = 'flex';
+    previewArea.classList.remove('cam-on');
+    startBtn.disabled = false; stopBtn.disabled = true; pauseBtn.disabled = true;
+    document.querySelectorAll('.q-btn, .text-input').forEach(el => el.disabled = false);
+    setPauseUI(false); setStatus('', 'Saving…');
+    window.removeEventListener('beforeunload', guard);
+  }
+
+  /* ── Pause ──────────────────────────── */
+  function setPauseUI(p) {
+    pauseIcon.innerHTML = p
+      ? '<polygon points="5 3 19 12 5 21 5 3" fill="currentColor"/>'
+      : '<rect x="6" y="4" width="4" height="16" rx="1"/><rect x="14" y="4" width="4" height="16" rx="1"/>';
+    pauseLabel.textContent = p ? 'Resume' : 'Pause';
+    if (!p) setStatus('recording', 'Recording');
+  }
+  function pauseResume() {
+    if (!mediaRecorder) return;
+    paused = !paused;
+    paused ? mediaRecorder.pause() : mediaRecorder.resume();
+    if (paused) setStatus('paused', 'Paused');
+    setPauseUI(paused);
+  }
+
+  /* ── Finalise ───────────────────────── */
+  async function finalise() {
+    const blob = new Blob(chunks, { type:'video/webm' });
+    const mb   = (blob.size / 1048576).toFixed(1);
+    const tag  = fileInput.value.trim().replace(/[^a-zA-Z0-9\-_]/g, '_');
+    const name = tag ? `${tag}.webm` : `recording-${Date.now()}.webm`;
+    const ts   = new Date().toLocaleTimeString([], { hour:'2-digit', minute:'2-digit' });
+    recordings.unshift({ url: URL.createObjectURL(blob), mb, name, ts, label:`${selectedQ.w}×${selectedQ.h} · ${selectedQ.fps}fps` });
+    renderRecordings();
+    setStatus('', 'Ready');
+    await clearChunks();
+  }
+
+  /* ── Render recordings ──────────────── */
+  function renderRecordings() {
+    recordingsCard.style.display = 'block';
+    recItems.innerHTML = '';
+    recordings.forEach((r,i) => {
+      const div = document.createElement('div');
+      div.className = 'rec-item';
+      div.innerHTML = `
+        <div class="rec-thumb">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 7l-7 5 7 5V7z"/><rect x="1" y="5" width="15" height="14" rx="2"/></svg>
+        </div>
+        <div class="rec-info">
+          <div class="rec-name">${r.name}</div>
+          <div class="rec-meta">${r.label} · ${r.mb} MB · ${r.ts}</div>
+        </div>
+        <button class="btn btn-ghost btn-sm" data-i="${i}">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:13px;height:13px"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+          Download
+        </button>`;
+      recItems.appendChild(div);
+    });
+    recItems.querySelectorAll('button[data-i]').forEach(btn => {
+      btn.onclick = () => {
+        const r = recordings[+btn.dataset.i];
+        Object.assign(document.createElement('a'), { href:r.url, download:r.name }).click();
+      };
+    });
+  }
+
+  /* ── Events ─────────────────────────── */
+  startBtn.onclick = startRecording;
+  stopBtn.onclick  = stopRecording;
+  pauseBtn.onclick = pauseResume;
+
+  document.addEventListener('keydown', e => {
+    if (e.target.tagName === 'INPUT') return;
+    if (e.ctrlKey && !e.shiftKey && e.key === 'r') { e.preventDefault(); if (!startBtn.disabled) startRecording(); }
+    if (e.ctrlKey && e.shiftKey  && e.key === 'S') { e.preventDefault(); if (!stopBtn.disabled) stopRecording(); }
+    if (e.ctrlKey && e.key === ' ')                { e.preventDefault(); if (!pauseBtn.disabled) pauseResume(); }
+  });
+
+})();
+</script>
+</body>
+</html>

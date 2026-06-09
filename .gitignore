@@ -1,0 +1,15 @@
+# Rust
+target/
+Cargo.lock
+
+# Tauri
+src-tauri/target/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Editor
+.vscode/
+.idea/
+*.swp
