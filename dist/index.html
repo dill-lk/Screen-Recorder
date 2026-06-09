@@ -640,6 +640,15 @@ body {
       db.transaction(STORE, 'readwrite').objectStore(STORE).clear().onsuccess = () => { totalBytes = 0; res(); };
     });
   }
+  function triggerDownload(url, filename) {
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    a.style.display = 'none';
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+  }
 
   /* ── Recovery ───────────────────────── */
   (async () => {
@@ -667,10 +676,10 @@ body {
             </div>
           </div>`;
         $('recoverBtn').onclick = () => {
-          const a = document.createElement('a');
-          a.href = URL.createObjectURL(new Blob(saved, { type: 'video/webm' }));
-          a.download = `recovered-${Date.now()}.webm`;
-          a.click();
+          const blob = new Blob(saved, { type: 'video/webm' });
+          const url = URL.createObjectURL(blob);
+          triggerDownload(url, `recovered-${Date.now()}.webm`);
+          setTimeout(() => URL.revokeObjectURL(url), 1000);
           clearChunks().then(() => recovSection.innerHTML = '');
         };
         $('discardBtn').onclick = () => {
@@ -854,7 +863,7 @@ body {
     const tag  = fileInput.value.trim().replace(/[^a-zA-Z0-9\-_]/g, '_');
     const name = tag ? `${tag}.webm` : `recording-${Date.now()}.webm`;
     const ts   = new Date().toLocaleTimeString([], { hour:'2-digit', minute:'2-digit' });
-    recordings.unshift({ url: URL.createObjectURL(blob), mb, name, ts, label:`${selectedQ.w}×${selectedQ.h} · ${selectedQ.fps}fps` });
+    recordings.unshift({ blob, mb, name, ts, label:`${selectedQ.w}×${selectedQ.h} · ${selectedQ.fps}fps` });
     renderRecordings();
     setStatus('', 'Ready');
     await clearChunks();
@@ -884,7 +893,9 @@ body {
     recItems.querySelectorAll('button[data-i]').forEach(btn => {
       btn.onclick = () => {
         const r = recordings[+btn.dataset.i];
-        Object.assign(document.createElement('a'), { href:r.url, download:r.name }).click();
+        const url = URL.createObjectURL(r.blob);
+        triggerDownload(url, r.name);
+        setTimeout(() => URL.revokeObjectURL(url), 1000);
       };
     });
   }
